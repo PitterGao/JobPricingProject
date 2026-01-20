@@ -1,7 +1,7 @@
 # 企业岗位定价模型（JobPricingProject ）
 
 **系统流程：企业分层 → 曝光预测 → 定价预测**
-![app](.\doc\app.png)
+![app](./doc/app.png)
 
 ![app1](./doc\app1.png)
 
