@@ -1,0 +1,9 @@
+{
+  "mae": 141.30503601327317,
+  "rmse": 200.8429582276112,
+  "mae_log1p": 0.5774284302391538,
+  "rmse_log1p": 0.7538186246839625,
+  "best_val_mae": 0.5774284302391538,
+  "health_model": "lstm",
+  "target_transform": "log1p"
+}

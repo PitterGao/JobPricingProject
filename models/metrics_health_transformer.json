@@ -1,0 +1,6 @@
+{
+  "val_mae": 0.02809290587902069,
+  "val_rmse": 0.07169035822153091,
+  "best_val_mae": 0.02809290587902069,
+  "health_model": "transformer"
+}

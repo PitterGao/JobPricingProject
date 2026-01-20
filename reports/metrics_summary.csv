@@ -1,0 +1,5 @@
+tag,target_transform,price_mae,price_rmse,price_mae_log1p,price_rmse_log1p,n_test,model_path
+lstm,log1p,150.53724591566268,218.85671258956384,0.6271065221436932,0.7756537820118218,600,E:\project\internship\JobPricingProject\models\price_mlp_lstm.pkl
+naive_median,raw,158.70892589502628,224.01859220625073,0.6459765745846721,0.8223266237823604,600,
+none,log1p,142.67220842773847,200.35689111346232,0.5782862484619221,0.7688204202610265,600,E:\project\internship\JobPricingProject\models\price_mlp_none.pkl
+transformer,log1p,148.70399460909482,215.54185439983368,0.6224285348371299,0.7737092794021867,600,E:\project\internship\JobPricingProject\models\price_mlp_transformer.pkl
