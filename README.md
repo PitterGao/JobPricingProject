@@ -1,9 +1,9 @@
 # 企业岗位定价模型（JobPricingProject ）
 
 **系统流程：企业分层 → 曝光预测 → 定价预测**
-![app](.\doc\app.png)
+![app](./doc/app.png)
 
-![app1](./doc\app1.png)
+![app1](./doc/pp1.png)
 
 ------
 
@@ -83,12 +83,14 @@ python -m src.train --health_model none
 #### 2.2 LSTM
 
 ```bash
+python -m src.train_health --health_model lstm
 python -m src.train --health_model lstm
 ```
 
 #### 2.3 Transformer
 
 ```bash
+python -m src.train_health --health_model transformer
 python -m src.train --health_model transformer
 ```
 
@@ -114,27 +116,27 @@ streamlit run app.py
 
 ### Impressions: True vs Pred
 
-> ![impressions_true_vs_pred](.\reports\impressions_true_vs_pred.png)
+> ![impressions_true_vs_pred](./reports/impressions_true_vs_pred.png)
 
 ### Pricing Model Comparison
 
-> ![model_compare_mae_rmse](.\reports\model_compare_mae_rmse.png)
+> ![model_compare_mae_rmse](./reports/model_compare_mae_rmse.png)
 
 ### Price Error Histogram（none / lstm / transformer）
 
-> ![price_calibration_decile_none](.\reports\price_calibration_decile_none.png)
+> ![price_calibration_decile_none](./reports/price_calibration_decile_none.png)
 >
-> ![price_calibration_decile_lstm](.\reports\price_calibration_decile_lstm.png)
+> ![price_calibration_decile_lstm](./reports/price_calibration_decile_lstm.png)
 >
-> ![price_calibration_decile_transformer](.\reports\price_calibration_decile_transformer.png)
+> ![price_calibration_decile_transformer](./reports/price_calibration_decile_transformer.png)
 
 ### Price: True vs Pred（none / lstm / transformer）
 
-> ![price_error_hist_none](.\reports\price_error_hist_none.png)
+> ![price_error_hist_none](./reports/price_error_hist_none.png)
 >
-> ![price_error_hist_lstm](.\reports\price_error_hist_lstm.png)
+> ![price_error_hist_lstm](./reports/price_error_hist_lstm.png)
 >
-> ![price_error_hist_transformer](.\reports\price_error_hist_transformer.png)
+> ![price_error_hist_transformer](./reports/price_error_hist_transformer.png)
 
 ------
 

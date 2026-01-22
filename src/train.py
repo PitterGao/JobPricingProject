@@ -45,8 +45,8 @@ def train_mlp_price(X_train, y_train, X_val, y_val, in_dim: int, cfg: MLPConfig)
     dev = device()
     model = PriceMLP(in_dim, cfg.hidden1, cfg.hidden2, cfg.dropout).to(dev)
     opt = torch.optim.Adam(model.parameters(), lr=cfg.lr)
-    # loss_fn = nn.L1Loss()
-    loss_fn = nn.HuberLoss(delta=1.0)
+    loss_fn = nn.L1Loss()
+    # loss_fn = nn.HuberLoss(delta=1.0)
 
     X_train_t = torch.tensor(X_train, dtype=torch.float32)
     y_train_t = torch.tensor(y_train, dtype=torch.float32)
@@ -99,6 +99,7 @@ def main():
         type=str,
         default="none",
         choices=["none", "lstm", "transformer"],
+        help="选择接入的健康度模型类型：none/lstm/transformer"
     )
     args = parser.parse_args()
 
@@ -109,9 +110,7 @@ def main():
 
     set_seed(42)
 
-    # -----------------------------
-    # 1) Load data
-    # -----------------------------
+    # Load data
     df = pd.read_parquet(paths.data_processed / "train_samples.parquet")
 
     if args.health_model != "none":

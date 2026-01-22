@@ -6,6 +6,7 @@ from src.predict import load_predictor, predict_one
 
 st.set_page_config(page_title="企业岗位定价模型 Demo", layout="wide")
 
+
 # -----------------------------
 # Helpers
 # -----------------------------
@@ -13,6 +14,7 @@ st.set_page_config(page_title="企业岗位定价模型 Demo", layout="wide")
 def _load(tag: str):
     """加载对应版本的推理器（会缓存）"""
     return load_predictor(price_tag=tag)
+
 
 def _health_sensitivity(predictor, base_payload, steps=21):
     """
@@ -27,6 +29,7 @@ def _health_sensitivity(predictor, base_payload, steps=21):
         prices.append(out["pred_price"])
     return hs, np.array(prices, dtype=float)
 
+
 def _variant_label(tag: str) -> str:
     mapping = {
         "none": "None",
@@ -34,6 +37,7 @@ def _variant_label(tag: str) -> str:
         "transformer": "Transformer",
     }
     return mapping.get(tag, tag)
+
 
 # -----------------------------
 # UI
@@ -60,7 +64,8 @@ with st.sidebar:
 
     st.divider()
     st.header("岗位信息输入")
-    job_function = st.selectbox("岗位方向（Job Function）", ["backend", "frontend", "data", "algo", "product", "qa", "ops"], index=0)
+    job_function = st.selectbox("岗位方向（Job Function）",
+                                ["backend", "frontend", "data", "algo", "product", "qa", "ops"], index=0)
     job_level = st.selectbox("岗位级别（Job Level）", ["junior", "mid", "senior", "lead"], index=1)
     location = st.selectbox("工作地点（Location）", ["sydney", "melbourne", "remote", "shanghai", "beijing"], index=0)
     salary_min = st.number_input("薪资下限（Salary Min）", min_value=30000, max_value=400000, value=90000, step=1000)
