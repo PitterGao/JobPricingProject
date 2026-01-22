@@ -3,7 +3,11 @@
 **系统流程：企业分层 → 曝光预测 → 定价预测**
 ![app](./doc/app.png)
 
+<<<<<<< HEAD
 ![app1](./doc/pp1.png)
+=======
+![app1](./doc/app1.png)
+>>>>>>> 2c49480d47e12514ce580ae33bf5f3bd91f46f0b
 
 ------
 
