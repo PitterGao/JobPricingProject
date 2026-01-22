@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Dict, Tuple
-
 import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
@@ -114,8 +111,7 @@ def simulate_labels(company_df: pd.DataFrame, job_df: pd.DataFrame, seed: int) -
         rng.normal(0, 0.6, size=len(merged))
     )
     p_view = sigmoid(attract_score)
-    base_intensity = 60.0
-    lam = np.exp(3.6 + 1 * (p_view - 0.5))  # 20~200+
+    lam = np.exp(3.6 + 3.0 * (p_view - 0.5))
     impressions = rng.poisson(lam)
 
     apply_rate = np.clip(0.015 + 0.04 * p_view, 0.01, 0.08)
@@ -130,24 +126,23 @@ def simulate_labels(company_df: pd.DataFrame, job_df: pd.DataFrame, seed: int) -
     expected_applies = apply_cnt * topschoolratio
     value_per_hq_apply = 600.0
     expected_value = value_per_hq_apply * expected_applies
-    # roi_target = rng.uniform(1.1, 2.2, size=len(merged))
-    roi_target = 3
+
+    roi_target = rng.uniform(1.1, 2.2, size=len(merged))
+    # roi_target = 3
     brand_factor = 0.8 + 0.1 * merged["brand_level"]
     price_label = expected_value / roi_target * brand_factor
-    price_label = np.clip(price_label, 100, 5000)
+    # price_label = np.clip(price_label, 100, 5000)
+    price_label = np.clip(price_label, 30, 5000)
 
     out = merged.copy()
     out["impressions"] = impressions
     out["apply_cnt"] = apply_cnt
     out["topschoolratio"] = topschoolratio
+    out["expected_applies"] = expected_applies
     out["price_label"] = price_label.astype(float)
     return out
 
 def generate_job_apply_logs(train_df: pd.DataFrame, health_cfg: HealthConfig, seed: int) -> pd.DataFrame:
-    """
-    为每个 job 生成 total_days 天的日志：
-    impressions_day, apply_cnt_day, hq_apply_cnt_day, success_rate_day
-    """
     rng = np.random.default_rng(seed + 100)
 
     rows = []
@@ -184,13 +179,6 @@ def generate_job_apply_logs(train_df: pd.DataFrame, health_cfg: HealthConfig, se
 
 
 def build_health_sequences(logs_df: pd.DataFrame, health_cfg: HealthConfig) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    用过去 history_len 天的 [impressions, apply_cnt, success_rate] 预测未来 horizon 天 success_rate 平均值
-    输出：
-      X: [N, T, F]
-      y: [N]
-      job_ids: [N]
-    """
     T = health_cfg.history_len
     H = health_cfg.horizon
 
@@ -310,6 +298,10 @@ def main():
         # labels
         "impressions",
         "price_label",
+        # pricing drivers
+        "apply_cnt",
+        "topschoolratio",
+        "expected_applies",
         # helpers / features
         "pred_impressions",
         "job_health_score",

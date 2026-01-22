@@ -122,6 +122,18 @@ streamlit run app.py
 
 > ![impressions_true_vs_pred](./reports/impressions_true_vs_pred.png)
 
+### price(None): True vs Pred
+
+> ![price_true_vs_pred_none](./reports/price_true_vs_pred_none.png)
+
+### price(Lstm): True vs Pred
+
+> ![price_true_vs_pred_lstm](./reports/price_true_vs_pred_lstm.png)
+
+### price(Transformer): True vs Pred
+
+> ![price_true_vs_pred_transformer](./reports/price_true_vs_pred_transformer.png)
+
 ### Pricing Model Comparison
 
 > ![model_compare_mae_rmse](./reports/model_compare_mae_rmse.png)

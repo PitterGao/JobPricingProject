@@ -55,7 +55,7 @@ def train_mlp_price(X_train, y_train, X_val, y_val, in_dim: int, cfg: MLPConfig)
     opt = torch.optim.Adam(model.parameters(), lr=cfg.lr)
     # loss_fn = nn.L1Loss()
     # loss_fn = nn.HuberLosds(delta=1.0)
-    loss_fn = nn.SmoothL1Loss(beta=0.5)
+    loss_fn = nn.SmoothL1Loss(beta=0.5, reduction="none")
 
     X_train_t = torch.tensor(X_train, dtype=torch.float32)
     y_train_t = torch.tensor(y_train, dtype=torch.float32)
@@ -84,7 +84,8 @@ def train_mlp_price(X_train, y_train, X_val, y_val, in_dim: int, cfg: MLPConfig)
             per_loss = loss_fn(ypred, ytrue)
             price_true = torch.expm1(ytrue).clamp(min=0.0)
             alpha = 0.8
-            w = 1.0 + alpha * (price_true / (price_true.mean() + 1e-6))
+            # w = 1.0 + alpha * (price_true / (price_true.mean() + 1e-6))
+            w = 1.0 + alpha * (price_true / (price_true.mean() + 1e-6)) ** 1.5
             loss = (per_loss * w).mean()
             loss.backward()
             opt.step()
@@ -234,6 +235,13 @@ def main():
         "rmse_log1p": rmse(y_val, pred_val_log),
     }
 
+    # ---- log-domain linear calibration: y ≈ a * pred + b ----
+    if len(pred_val_log) >= 2 and np.std(pred_val_log) > 1e-8:
+        a, b = np.polyfit(pred_val_log, y_val, deg=1)
+    else:
+        a, b = 1.0, 0.0
+    pred_val_log = a * pred_val_log + b
+
     y_val_price = np.expm1(y_val)
     pred_val_price = np.expm1(pred_val_log)
     pred_val_price = np.clip(pred_val_price, 30.0, 5000.0)
@@ -255,6 +263,7 @@ def main():
         "dropout": mlp_cfg.dropout,
         "health_model": args.health_model,
         "target_transform": "log1p",
+        "log_calib": {"a": float(a), "b": float(b)},
     }
 
     tagged_path = paths.models / f"price_mlp_{args.health_model}.pkl"

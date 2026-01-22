@@ -76,6 +76,7 @@ def _predict_price_from_mlp(
         mlp: nn.Module,
         Xt_price: np.ndarray,
         price_target_transform: str,
+        log_calib: dict | None = None,
         clip_low: float = 30.0,
         clip_high: float = 5000.0,
 ) -> float:
@@ -83,10 +84,16 @@ def _predict_price_from_mlp(
     with torch.no_grad():
         raw = float(mlp(torch.tensor(Xt_price, dtype=torch.float32).to(dev)).cpu().numpy()[0])
 
+    # apply log-domain calibration if present
+    if log_calib is not None and price_target_transform == "log1p":
+        a = float(log_calib.get("a", 1.0))
+        b = float(log_calib.get("b", 0.0))
+        raw = a * raw + b
+
     if price_target_transform == "log1p":
         pred = float(np.expm1(raw))
     else:
-        pred = float(raw)
+        pred = raw
 
     pred = float(np.clip(pred, clip_low, clip_high))
     return pred
@@ -120,6 +127,7 @@ def load_predictor(price_tag: str = "none"):
     mlp.eval()
 
     price_target_transform = str(mlp_ckpt.get("target_transform", "none"))
+    log_calib = mlp_ckpt.get("log_calib", {"a": 1.0, "b": 0.0})
 
     return {
         "transformer": transformer,
@@ -129,6 +137,7 @@ def load_predictor(price_tag: str = "none"):
         "feature_cfg": feat_cfg,
         "price_target_transform": price_target_transform,
         "price_tag": price_tag,
+        "log_calib": log_calib,
     }
 
 
@@ -171,10 +180,46 @@ def predict_one(predictor: Dict[str, Any], payload: Dict[str, Any]) -> Dict[str,
     pred_impressions = float(np.expm1(pred_log))
     pred_impressions = float(max(0.0, pred_impressions))
 
+    def _sigmoid(x: float) -> float:
+        return 1.0 / (1.0 + np.exp(-x))
+
+    def _hot_function(jf: str) -> int:
+        return 1 if jf in {"algo", "data", "backend"} else 0
+
+    hf = _hot_function(str(row.get("job_function", "backend")))
+    salary_mid = float(row.get("salary_mid", (row.get("salary_min", 90000) + row.get("salary_max", 130000)) / 2))
+
+    attract_score = (
+            0.6 * (float(row.get("brand_level", 3)) - 1.0) +
+            0.00001 * salary_mid +
+            0.8 * float(row.get("intl_flag", 0)) +
+            0.7 * float(row.get("target_top10", 0)) +
+            0.9 * float(hf) +
+            1.2 * float(row.get("talent_care_index", 0.5))
+    )
+    p_view = _sigmoid(attract_score)
+
+    apply_rate = float(np.clip(0.015 + 0.04 * p_view, 0.01, 0.08))
+    topschoolratio = float(np.clip(
+        0.08
+        + 0.03 * (float(row.get("brand_level", 3)) - 1.0)
+        + 0.05 * float(row.get("target_top10", 0))
+        + 0.07 * float(row.get("talent_care_index", 0.5)),
+        0.02, 0.45
+    ))
+
+    apply_cnt = float(pred_impressions * apply_rate)
+    expected_applies = float(apply_cnt * topschoolratio)
+
     # Predict price (MLP)
     row_price = dict(row)
     row_price["pred_impressions"] = pred_impressions
     row_price["job_health_score"] = float(row_price.get("job_health_score", 0.5))
+
+    # fill new numeric features required by FeatureConfig
+    row_price["apply_cnt"] = apply_cnt
+    row_price["topschoolratio"] = topschoolratio
+    row_price["expected_applies"] = expected_applies
 
     X_price = pd.DataFrame([row_price])
     X_price = X_price[list(feat_cfg.categorical_cols) + list(feat_cfg.numeric_cols)]
@@ -184,6 +229,7 @@ def predict_one(predictor: Dict[str, Any], payload: Dict[str, Any]) -> Dict[str,
         mlp=mlp,
         Xt_price=Xt_price,
         price_target_transform=price_target_transform,
+        log_calib=predictor.get("log_calib"),
         clip_low=30.0,
         clip_high=5000.0,
     )
