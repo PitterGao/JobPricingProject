@@ -32,7 +32,6 @@ def generate_company_table(cfg: DataConfig, tier_cfg: TierConfig) -> pd.DataFram
     funding_stage = rng.choice(FUNDING_STAGES, size=cfg.n_companies, p=[0.12,0.18,0.18,0.16,0.10,0.26])
     intl_flag = rng.integers(0, 2, size=cfg.n_companies)
 
-    # soft metrics (0-100-ish)
     training_budget = np.clip(rng.normal(60, 15, cfg.n_companies), 0, 100)
     promotion_rate = np.clip(rng.normal(55, 18, cfg.n_companies), 0, 100)
     work_life_balance = np.clip(rng.normal(58, 16, cfg.n_companies), 0, 100)
@@ -207,7 +206,6 @@ def build_health_sequences(logs_df: pd.DataFrame, health_cfg: HealthConfig) -> t
     return X, y, job_ids
 
 
-# Build Tier model artifact
 def fit_tier_model(company_df: pd.DataFrame, seed: int) -> TierModelArtifact:
     hard_cols = ["company_size", "brand_level", "funding_stage_num"]
     scaler = StandardScaler()
@@ -261,7 +259,6 @@ def main():
     full_df["pred_impressions"] = full_df["impressions"].astype(float)
     full_df["job_health_score"] = 0.5
 
-    # ---------- bonus: generate job_apply_logs & health sequences ----------
     logs_df = generate_job_apply_logs(full_df, health_cfg, data_cfg.seed)
     logs_df.to_parquet(paths.data_processed / "job_apply_logs.parquet", index=False)
 
@@ -270,6 +267,14 @@ def main():
         paths.data_processed / "health_sequences.npz",
         X=Xh, y=yh, job_ids=job_ids
     )
+
+    health_target = pd.DataFrame({"job_id": job_ids.astype(int), "health_true": yh.astype(float)})
+    full_df = full_df.merge(health_target, on="job_id", how="left")
+    full_df["health_true"] = full_df["health_true"].fillna(full_df["health_true"].mean())
+
+    h = np.clip(full_df["health_true"].to_numpy(dtype=float), 0.0, 1.0)
+    health_effect = 0.85 + 0.30 * h
+    full_df["price_label"] = np.clip(full_df["price_label"] * health_effect, 30.0, 5000.0)
 
     keep_cols = [
         # ids
@@ -305,6 +310,7 @@ def main():
         # helpers / features
         "pred_impressions",
         "job_health_score",
+        "health_true",
     ]
 
     train_df = full_df[keep_cols].copy()

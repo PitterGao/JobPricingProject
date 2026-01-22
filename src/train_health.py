@@ -99,11 +99,9 @@ def main():
         "health_model": args.health_model,
     }
 
-    # predict for all jobs -> health score in [0,1]
     pred_all = predict_all(build_model(args.health_model, cfg), best_state, X)
     pred_all = np.clip(pred_all, 0.0, 1.0)
 
-    # save checkpoint + per-job score
     ckpt = {
         "health_model": args.health_model,
         "state_dict": best_state,
@@ -112,7 +110,6 @@ def main():
     save_joblib(ckpt, paths.models / f"health_{args.health_model}.pkl")
     save_json(metrics, paths.models / f"metrics_health_{args.health_model}.json")
 
-    # job_id -> score
     job_health = {"job_id": job_ids.tolist(), "job_health_score": pred_all.astype(float).tolist()}
     save_joblib(job_health, paths.models / f"job_health_scores_{args.health_model}.pkl")
 

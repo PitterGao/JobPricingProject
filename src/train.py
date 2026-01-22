@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, Tuple
 
-import argparse
 import numpy as np
 import pandas as pd
 import torch
@@ -62,7 +61,6 @@ def train_mlp_price(X_train, y_train, X_val, y_val, in_dim: int, cfg: MLPConfig)
     X_val_t = torch.tensor(X_val, dtype=torch.float32)
     y_val_t = torch.tensor(y_val, dtype=torch.float32)
 
-    # simple mini-batch training
     n = X_train_t.shape[0]
     best_val = float("inf")
     best_state = None
@@ -104,6 +102,12 @@ def train_mlp_price(X_train, y_train, X_val, y_val, in_dim: int, cfg: MLPConfig)
 
     return best_state, {"best_val_mae": best_val}
 
+def freeze_to_mean(df_cur: pd.DataFrame, df_ref: pd.DataFrame, cols):
+    df_cur = df_cur.copy()
+    for c in cols:
+        if c in df_cur.columns:
+            df_cur[c] = float(df_ref[c].mean())
+    return df_cur
 
 def main():
     import argparse
@@ -148,6 +152,7 @@ def main():
     transformer = enc["transformer"]
 
     X_cols = list(feat_cfg.categorical_cols) + list(feat_cfg.numeric_cols)
+    leak_cols = ["apply_cnt", "topschoolratio", "expected_applies"]
 
     idx_all = np.arange(len(df))
     idx_train, idx_val = train_test_split(idx_all, test_size=0.2, random_state=42)
@@ -158,6 +163,7 @@ def main():
     if "job_health_score" in df_imp.columns:
         df_imp["job_health_score"] = df_imp["job_health_score"].fillna(0.5)
 
+    df_imp = freeze_to_mean(df_imp, df, leak_cols)
     X_imp = df_imp[X_cols]
     y_imp = np.log1p(df_imp["impressions"].values.astype(float))
 
@@ -182,28 +188,23 @@ def main():
         "rmse": rmse(y_val_raw, y_pred_raw),
         "mae": mae(y_val_raw, y_pred_raw),
     }
-
-    metrics_imp = {
-        "rmse_log1p": rmse(y_val, y_pred_val),
-        "mae_log1p": mae(y_val, y_pred_val),
-    }
-
     save_joblib(xgb, paths.models / "impression_xgb.pkl")
     save_json(metrics_imp, paths.models / "metrics_impression.json")
     print("Saved impression_xgb.pkl")
 
-    # Build pred_impressions for pricing model using trained XGB
     df_price = df.copy()
-
     df_for_pred = df_price.copy()
     df_for_pred["pred_impressions"] = 0.0
     df_for_pred["job_health_score"] = df_for_pred["job_health_score"].fillna(0.5)
+    df_for_pred = freeze_to_mean(df_for_pred, df, leak_cols)
 
     X_all_imp = transformer.transform(df_for_pred[X_cols])
     pred_log_all = xgb.predict(X_all_imp)
     df_price["pred_impressions"] = np.maximum(0.0, np.expm1(pred_log_all))
-
     df_price["job_health_score"] = df_price["job_health_score"].fillna(0.5)
+
+    if args.health_model != "none":
+        df_price = freeze_to_mean(df_price, df, ["topschoolratio", "expected_applies"])
 
     # Train pricing model (2-layer MLP)
     Xp = df_price[X_cols]
@@ -235,7 +236,6 @@ def main():
         "rmse_log1p": rmse(y_val, pred_val_log),
     }
 
-    # ---- log-domain linear calibration: y ≈ a * pred + b ----
     if len(pred_val_log) >= 2 and np.std(pred_val_log) > 1e-8:
         a, b = np.polyfit(pred_val_log, y_val, deg=1)
     else:

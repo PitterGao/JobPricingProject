@@ -61,8 +61,6 @@ def load_price_model(paths: Paths, tag: str):
     model.load_state_dict(ckpt["state_dict"])
     model.eval()
 
-    # training target transform flag (new models should save this)
-    # allowed: "raw" / "log1p"
     target_transform = ckpt.get("target_transform", "raw")
     return model, ckpt_path, target_transform
 
@@ -103,7 +101,6 @@ def plot_error_hist(y_true: np.ndarray, y_pred: np.ndarray, title: str, out_path
 
 
 def plot_model_compare(df_metrics: pd.DataFrame, out_path: Path):
-    # df_metrics columns: tag, price_mae, price_rmse
     tags = df_metrics["tag"].tolist()
     mae_vals = df_metrics["price_mae"].tolist()
     rmse_vals = df_metrics["price_rmse"].tolist()
@@ -219,7 +216,6 @@ def main():
     pd.DataFrame([imp_metrics]).to_csv(reports_dir / "impressions_metrics.csv", index=False)
     print("Saved:", reports_dir / "impressions_metrics.csv")
 
-    # Pricing preparation
     df_price_test = df_test.copy()
 
     if "job_health_score" not in df_price_test.columns:
@@ -238,7 +234,6 @@ def main():
     print("\nPricing label stats on TEST:")
     summarize_distribution("price_true", y_price_true)
 
-    # Naive baseline: predict train median
     y_train_price = df_train["price_label"].values.astype(float)
     naive_pred = np.full_like(y_price_true, fill_value=float(np.median(y_train_price)))
     naive_row = {
@@ -253,11 +248,9 @@ def main():
     }
     print("\n[naive_median] price metrics on TEST:", naive_row)
 
-    # Evaluate pricing models
     tags = ["none", "lstm", "transformer"]
     rows: List[Dict] = [naive_row]
 
-    # clip range
     clip_lo = float(min(30.0, np.min(y_train_price)))
     clip_hi = float(max(5000.0, np.max(y_train_price) * 3.0))
 
@@ -323,7 +316,6 @@ def main():
     df_metrics.to_csv(reports_dir / "metrics_summary.csv", index=False)
     print("\nSaved metrics summary:", reports_dir / "metrics_summary.csv")
 
-    # compare only learned models (exclude naive) for bar plot, but keep it if you want
     df_plot = df_metrics[df_metrics["tag"] != "naive_median"].copy()
     if len(df_plot) > 0:
         plot_model_compare(df_plot, reports_dir / "model_compare_mae_rmse.png")

@@ -84,7 +84,6 @@ def _predict_price_from_mlp(
     with torch.no_grad():
         raw = float(mlp(torch.tensor(Xt_price, dtype=torch.float32).to(dev)).cpu().numpy()[0])
 
-    # apply log-domain calibration if present
     if log_calib is not None and price_target_transform == "log1p":
         a = float(log_calib.get("a", 1.0))
         b = float(log_calib.get("b", 0.0))
@@ -112,8 +111,6 @@ def load_predictor(price_tag: str = "none"):
 
     tier_model = load_joblib(paths.models / "tier_model.pkl")
     xgb = load_joblib(paths.models / "impression_xgb.pkl")
-
-    # price model
     mlp_ckpt = load_joblib(paths.models / f"price_mlp_{price_tag}.pkl")
 
     dev = device()
@@ -166,10 +163,8 @@ def predict_one(predictor: Dict[str, Any], payload: Dict[str, Any]) -> Dict[str,
     tier = tier_model.predict_tier(company_df).iloc[0]
     row["enterprise_tier"] = tier
 
-    # Predict impressions (XGB, log1p domain)
     row_imp = dict(row)
-    row_imp["pred_impressions"] = 0.0  # consistent with training/inference
-    # ensure health exists
+    row_imp["pred_impressions"] = 0.0
     row_imp["job_health_score"] = float(row_imp.get("job_health_score", 0.5))
 
     X_imp = pd.DataFrame([row_imp])
@@ -211,12 +206,10 @@ def predict_one(predictor: Dict[str, Any], payload: Dict[str, Any]) -> Dict[str,
     apply_cnt = float(pred_impressions * apply_rate)
     expected_applies = float(apply_cnt * topschoolratio)
 
-    # Predict price (MLP)
     row_price = dict(row)
     row_price["pred_impressions"] = pred_impressions
     row_price["job_health_score"] = float(row_price.get("job_health_score", 0.5))
 
-    # fill new numeric features required by FeatureConfig
     row_price["apply_cnt"] = apply_cnt
     row_price["topschoolratio"] = topschoolratio
     row_price["expected_applies"] = expected_applies
