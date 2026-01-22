@@ -130,10 +130,11 @@ def simulate_labels(company_df: pd.DataFrame, job_df: pd.DataFrame, seed: int) -
     expected_applies = apply_cnt * topschoolratio
     value_per_hq_apply = 600.0
     expected_value = value_per_hq_apply * expected_applies
-    roi_target = rng.uniform(1.1, 2.2, size=len(merged))
-    brand_factor = 0.9 + 0.08 * merged["brand_level"]
+    # roi_target = rng.uniform(1.1, 2.2, size=len(merged))
+    roi_target = 3
+    brand_factor = 0.8 + 0.1 * merged["brand_level"]
     price_label = expected_value / roi_target * brand_factor
-    price_label = np.clip(price_label, 30, 5000)
+    price_label = np.clip(price_label, 100, 5000)
 
     out = merged.copy()
     out["impressions"] = impressions

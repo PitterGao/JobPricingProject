@@ -13,8 +13,8 @@ class Paths:
 @dataclass(frozen=True)
 class DataConfig:
     seed: int = 42
-    n_companies: int = 800
-    n_jobs: int = 3000
+    n_companies: int = 500
+    n_jobs: int = 1500
     n_days_logs: int = 21
 
 
@@ -63,14 +63,16 @@ class XGBConfig:
     def __post_init__(self):
         if self.params is None:
             object.__setattr__(self, "params", {
-                "n_estimators": 400,
+                "n_estimators": 2000,
                 "max_depth": 6,
-                "learning_rate": 0.05,
-                "subsample": 0.9,
+                "learning_rate": 0.03,
+                "subsample": 0.8,
                 "colsample_bytree": 0.9,
                 "reg_lambda": 1.0,
+                "min_child_weight": 2,
                 "random_state": 42,
-                "objective": "reg:squarederror",
+                "tree_method": "hist",
+                "objective": "reg:squarederror"
             })
 
 
@@ -92,7 +94,7 @@ class HealthConfig:
     feat_dim: int = 3
     lr: float = 1e-3
     batch_size: int = 256
-    epochs: int = 20
+    epochs: int = 30
     d_model: int = 64
     nhead: int = 4
     num_layers: int = 2

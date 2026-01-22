@@ -14,11 +14,13 @@ from xgboost import XGBRegressor
 from src.config import Paths, FeatureConfig, XGBConfig, MLPConfig
 from src.utils import load_joblib, save_joblib, save_json, set_seed, mae, rmse, device
 
+
 @dataclass
 class TrainArtifacts:
     xgb_impression: XGBRegressor
     mlp_state: Dict
     mlp_meta: Dict
+
 
 class PriceMLP(nn.Module):
     def __init__(self, in_dim: int, h1: int, h2: int, dropout: float):
@@ -36,17 +38,24 @@ class PriceMLP(nn.Module):
     def forward(self, x):
         return self.net(x).squeeze(-1)
 
+
 def train_xgb_impressions(X_train, y_train, X_val, y_val, cfg: XGBConfig):
     model = XGBRegressor(**cfg.params)
-    model.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=False)
+    model.fit(
+        X_train, y_train,
+        eval_set=[(X_val, y_val)],
+        verbose=False,
+    )
     return model
+
 
 def train_mlp_price(X_train, y_train, X_val, y_val, in_dim: int, cfg: MLPConfig):
     dev = device()
     model = PriceMLP(in_dim, cfg.hidden1, cfg.hidden2, cfg.dropout).to(dev)
     opt = torch.optim.Adam(model.parameters(), lr=cfg.lr)
-    loss_fn = nn.L1Loss()
-    # loss_fn = nn.HuberLoss(delta=1.0)
+    # loss_fn = nn.L1Loss()
+    # loss_fn = nn.HuberLosds(delta=1.0)
+    loss_fn = nn.SmoothL1Loss(beta=0.5)
 
     X_train_t = torch.tensor(X_train, dtype=torch.float32)
     y_train_t = torch.tensor(y_train, dtype=torch.float32)
@@ -72,7 +81,11 @@ def train_mlp_price(X_train, y_train, X_val, y_val, in_dim: int, cfg: MLPConfig)
 
             opt.zero_grad()
             ypred = model(xb)
-            loss = loss_fn(ypred, ytrue)
+            per_loss = loss_fn(ypred, ytrue)
+            price_true = torch.expm1(ytrue).clamp(min=0.0)
+            alpha = 0.8
+            w = 1.0 + alpha * (price_true / (price_true.mean() + 1e-6))
+            loss = (per_loss * w).mean()
             loss.backward()
             opt.step()
 
@@ -86,9 +99,10 @@ def train_mlp_price(X_train, y_train, X_val, y_val, in_dim: int, cfg: MLPConfig)
             best_state = {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
 
         if (epoch + 1) % 5 == 0:
-            print(f"Epoch {epoch+1:02d}/{cfg.epochs} | val_MAE={best_val:.3f}")
+            print(f"Epoch {epoch + 1:02d}/{cfg.epochs} | val_MAE={best_val:.3f}")
 
     return best_state, {"best_val_mae": best_val}
+
 
 def main():
     import argparse
@@ -134,6 +148,9 @@ def main():
 
     X_cols = list(feat_cfg.categorical_cols) + list(feat_cfg.numeric_cols)
 
+    idx_all = np.arange(len(df))
+    idx_train, idx_val = train_test_split(idx_all, test_size=0.2, random_state=42)
+
     # Train impression model (XGB)
     df_imp = df.copy()
     df_imp["pred_impressions"] = 0.0
@@ -143,9 +160,10 @@ def main():
     X_imp = df_imp[X_cols]
     y_imp = np.log1p(df_imp["impressions"].values.astype(float))
 
-    X_train, X_val, y_train, y_val = train_test_split(
-        X_imp, y_imp, test_size=0.2, random_state=42
-    )
+    X_train = X_imp.iloc[idx_train]
+    X_val = X_imp.iloc[idx_val]
+    y_train = y_imp[idx_train]
+    y_val = y_imp[idx_val]
 
     X_train_t = transformer.transform(X_train)
     X_val_t = transformer.transform(X_val)
@@ -153,6 +171,17 @@ def main():
     xgb = train_xgb_impressions(X_train_t, y_train, X_val_t, y_val, xgb_cfg)
 
     y_pred_val = xgb.predict(X_val_t)
+
+    y_val_raw = np.expm1(y_val)
+    y_pred_raw = np.maximum(0.0, np.expm1(y_pred_val))
+
+    metrics_imp = {
+        "rmse_log1p": rmse(y_val, y_pred_val),
+        "mae_log1p": mae(y_val, y_pred_val),
+        "rmse": rmse(y_val_raw, y_pred_raw),
+        "mae": mae(y_val_raw, y_pred_raw),
+    }
+
     metrics_imp = {
         "rmse_log1p": rmse(y_val, y_pred_val),
         "mae_log1p": mae(y_val, y_pred_val),
@@ -179,16 +208,17 @@ def main():
     Xp = df_price[X_cols]
     yp = np.log1p(df_price["price_label"].values.astype(float))
 
-    X_train, X_val, y_train, y_val = train_test_split(
-        Xp, yp, test_size=0.2, random_state=42
-    )
+    X_train = Xp.iloc[idx_train]
+    X_val = Xp.iloc[idx_val]
+    y_train = yp[idx_train]
+    y_val = yp[idx_val]
 
     X_train_t = transformer.transform(X_train).astype(np.float32)
     X_val_t = transformer.transform(X_val).astype(np.float32)
 
     in_dim = X_train_t.shape[1]
     best_state, meta = train_mlp_price(
-        X_train_t, y_train, X_val_t, y_val, in_dim, mlp_cfg
+        X_train_t, y_train, X_val_t, y_val, in_dim, mlp_cfg,
     )
 
     # final eval
