@@ -203,9 +203,6 @@ def main():
     df_price["pred_impressions"] = np.maximum(0.0, np.expm1(pred_log_all))
     df_price["job_health_score"] = df_price["job_health_score"].fillna(0.5)
 
-    if args.health_model != "none":
-        df_price = freeze_to_mean(df_price, df, ["topschoolratio", "expected_applies"])
-
     # Train pricing model (2-layer MLP)
     Xp = df_price[X_cols]
     yp = np.log1p(df_price["price_label"].values.astype(float))

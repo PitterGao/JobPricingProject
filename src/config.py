@@ -51,9 +51,6 @@ class FeatureConfig:
         "intl_flag",
         "target_top10",
         "talent_care_index",
-        "apply_cnt",
-        "topschoolratio",
-        "expected_applies",
         "pred_impressions",
         "job_health_score",
     )
